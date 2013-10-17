@@ -226,7 +226,7 @@ sub forward {
 	my ($self, $mlen, $plen) = @_;
 	my $str = substr($self->{all_match}[$self->{cur_index}], $mlen, $plen - $mlen);
 
-	$self->tt_write($self->locale_encode($str));
+	$self->tt_write($self->locale_encode($self->special_decode($str)));
 }
 
 sub commit {
@@ -236,7 +236,7 @@ sub commit {
 	$str = substr($str, length($self->{match_str}));
 	deactivate($self);
 	# $self->scr_add_lines($str);
-	$self->tt_write($self->locale_encode($str));
+	$self->tt_write($self->locale_encode($self->special_decode($str)));
 }
 
 sub activate {
