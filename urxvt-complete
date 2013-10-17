@@ -226,7 +226,7 @@ sub forward {
 	my ($self, $mlen, $plen) = @_;
 	my $str = substr($self->{all_match}[$self->{cur_index}], $mlen, $plen - $mlen);
 
-	$self->tt_write($str);
+	$self->tt_write($self->locale_encode($str));
 }
 
 sub commit {
@@ -236,7 +236,7 @@ sub commit {
 	$str = substr($str, length($self->{match_str}));
 	deactivate($self);
 	# $self->scr_add_lines($str);
-	$self->tt_write($str);
+	$self->tt_write($self->locale_encode($str));
 }
 
 sub activate {
@@ -250,8 +250,6 @@ sub activate {
 	$self->{match_str} = $cur;
 	$self->{cur_index} = 0;
 
-	$self->{activat} = 1;
-
 	if (! @all) {
 		return;
 	} elsif (scalar(@all) == 1 && !$self->{in_line_inc}) {
@@ -259,6 +257,7 @@ sub activate {
 		return;
 	}
 
+	$self->{activat} = 1;
 	init_overlay($self);
 	$self->enable(
 		"key_press" => \&key_press,
