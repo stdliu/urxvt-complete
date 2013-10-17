@@ -1,0 +1,279 @@
+#!/usr/bin/perl
+# Author: stdliu@gmail.com
+# License: GPLv2
+
+# URxvt completion extension.
+#
+# Usage : 
+# URxvt.perl-ext-common: urxvt-complete
+# URxvt.keysym.M-Tab: perl:urxvt-complete:activate
+#
+# Use Meta-Tab to activate complete mode, then use the following keys:
+# 	Ctrl-n/Alt-n/Down : choose next.
+# 	Ctrl-p/Alt-p/Up : choose prev.
+# 	Tab : forward common prefix, or choise next.
+# 	Enter/Space : commit.
+# 	Escape: deactivate complete mode.
+#
+
+use List::Util qw(min max);
+
+#
+# Attributes: 
+# 	activate : bool, is activated
+# 	all_match : matched text array reference
+# 	match_str : cursor string for match
+# 	ol_x : overlay x
+# 	ol_y : overlay y
+# 	ol_w : overlay width
+# 	ol_h : overlay height
+# 	nl_rend : normal overlay rend
+# 	hl_rend : highlight overlay rend
+# 	ol_start : overlay display start offset in all_match
+# 	cur_index : selected string index in all_match
+# 	in_line_inc : in line increment, can not be reseted in deactivate
+
+sub on_start {
+	my ($self) = @_; 
+	$self->{hl_rend} = [ () ];
+	$self->{nl_rend} = [ () ];
+}
+
+sub on_user_command {
+    my ($self, $cmd) = @_; 
+
+    if ($cmd eq 'urxvt-complete:activate') {
+		activate($self);
+    }
+	()
+}
+
+sub all_text {
+	my ($self, $only_visible) = @_;
+
+	my $text = "";
+	for (my $i = $only_visible ? 0 : $self->top_row; $i < $self->nrow; $i++) {
+		$text = $text . $self->ROW_t($i);
+	}
+
+	return $text;
+}
+
+sub cursor_text {
+	my ($self) = @_;
+	my ($row, $col) = $self->screen_cur();
+	$row = $self->ROW_t($row);
+	$row = substr($row, 0, $col);
+	if ($row =~ /.*\s([^\s]*)\z/) {
+		$row = $1;
+	}
+
+	return $row
+}
+
+sub match_array {
+	my ($all, $cur) = @_;
+	my @text_array = split(/\s+/, $all);
+
+	my @match = ();
+	my $len = length($cur);
+	foreach my $str (@text_array) {
+		if ((substr($str, 0, $len) eq $cur) and (length($str) > $len)) {
+			push(@match, $str);
+		}
+	}
+	@match = sort(@match);
+
+	my %seen;
+	return grep { !$seen{$_}++; } @match;
+}
+
+sub max_str_length {
+	my (@all) = @_;
+	my $len = 0;
+	for my $s (@all) {
+		$len = length($s) if (length($s) > $len);
+	}
+
+	return $len;
+}
+
+sub common_prefix_length {
+	my $prefix = shift;
+	for (@_) {
+		chop $prefix while (! /^\Q$prefix\E/);
+	}
+	return length($prefix);
+}
+
+sub set_ol_text {
+	my ($self) = @_;
+
+	my @all= @{$self->{all_match}};
+	my $h = $self->{ol_h};
+	my $w = $self->{ol_w};
+	my $index = $self->{cur_index};
+	my $start = $self->{ol_start};
+	my $ol = $self->{overlay};
+
+	for my $i (scalar(@{$self->{hl_rend}}) .. $w) {
+		push(@{$self->{hl_rend}}, urxvt::SET_BGCOLOR(urxvt::OVERLAY_RSTYLE, 5));
+		push(@{$self->{nl_rend}}, urxvt::OVERLAY_RSTYLE);
+	}
+
+	foreach my $i ($start .. $start + $h - 1) {
+		$ol->set(0, $i - $start, $all[$i],
+			$i == $index ? \@{$self->{hl_rend}} : \@{$self->{nl_rend}});
+	}
+}
+
+sub init_overlay {
+	my ($self) = @_;
+
+	my @all= @{$self->{all_match}};
+	my $match_len = length($self->{match_str});
+
+	my $h = min(scalar(@all), int($self->nrow / 2));
+	my $w = min(max_str_length(@all), $self->ncol);
+	my ($y, $x) = $self->screen_cur();
+	$x = $x - $match_len;
+	$y = ($y + 1 + $h >= $self->nrow) ? ($y - $h) : ($y + 1);
+	$self->{ol_x} = $x;
+	$self->{ol_y} = $y;
+	$self->{ol_w} = $w;
+	$self->{ol_h} = $h;
+	$self->{cur_index} = 0;
+	$self->{ol_start} = 0;
+
+	delete $self->{overlay} if $self->{overlay};
+	$self->{overlay} = $self->overlay($x, $y, $w, $h, urxvt::OVERLAY_RSTYLE, 0);
+	my $ol = $self->{overlay};
+	$self->want_refresh();
+
+	set_ol_text($self);
+}
+
+sub goto_next {
+	my ($self, $forward) = @_;
+
+	my $len = scalar(@{$self->{all_match}});
+	$self->{cur_index} = ($len + $self->{cur_index} + $forward) % $len;
+	if ($self->{ol_start} + $self->{ol_h} <= $self->{cur_index}) {
+		$self->{ol_start} = $self->{cur_index} - $self->{ol_h} + 1;
+	}
+	if ($self->{ol_start} > $self->{cur_index}) {
+		$self->{ol_start} = $self->{cur_index};
+	}
+
+	set_ol_text($self);
+}
+
+sub line_update {
+	my ($self, $row) = @_; 
+
+	my $cur = cursor_text($self);
+	if (length($cur) > length($self->{match_str})) {
+		$self->{in_line_inc} = 1;
+	} else {
+		$self->{in_line_inc} = 0;
+	}
+	deactivate($self);
+	activate($self);
+}
+
+sub key_press {
+	my ($self, $event, $keysym, $string) = @_;
+
+	# lookup keyboard code in X11/keysymdef.h
+
+	my $char = chr($keysym);
+	if ($keysym == 0xff1b) { # Esc
+		deactivate($self);
+		return 1;
+	} elsif ($keysym == 0xff52) { # Up
+		goto_next($self, -1);
+		return 1;
+	} elsif ($keysym == 0xff54) { # Down
+		goto_next($self, 1);
+		return 1;
+	} elsif ($keysym == 0x0020 || $keysym == 0xff0d || $keysym == 0xff8d) { # Space, Enter, Enter
+		commit($self);
+		return 1;
+	} elsif ($keysym == 0xff09) { # Tab
+		if (scalar(@{$self->{all_match}}) == 1) {
+			commit($self);
+		} else {
+			my $prefix_len = common_prefix_length(@{$self->{all_match}});
+			if ($prefix_len > length($self->{match_str})) {
+				forward($self, length($self->{match_str}), $prefix_len);
+			} else {
+				goto_next($self, 1);
+			}
+		}
+		return 1;
+	} elsif (($event->{state} & urxvt::ControlMask) || ($event->{state} & urxvt::Mod1Mask)) { # Mod1 == ALT
+		if ($char eq 'n') {
+			goto_next($self, 1);
+		} elsif ($char eq 'p') {
+			goto_next($self, -1);
+		}
+		return 1;
+	}
+	return ;
+}
+
+sub forward {
+	my ($self, $mlen, $plen) = @_;
+	my $str = substr($self->{all_match}[$self->{cur_index}], $mlen, $plen - $mlen);
+
+	$self->tt_write($str);
+}
+
+sub commit {
+	my ($self) = @_; 
+	my $str = $self->{all_match}[$self->{cur_index}];
+
+	$str = substr($str, length($self->{match_str}));
+	deactivate($self);
+	# $self->scr_add_lines($str);
+	$self->tt_write($str);
+}
+
+sub activate {
+	my ($self) = @_;
+
+	my $text = all_text($self);
+	my $cur = cursor_text($self);
+	my @all = match_array($text, $cur);
+
+	$self->{all_match} = \@all;
+	$self->{match_str} = $cur;
+	$self->{cur_index} = 0;
+
+	$self->{activat} = 1;
+
+	if (! @all) {
+		return;
+	} elsif (scalar(@all) == 1 && !$self->{in_line_inc}) {
+		commit($self);
+		return;
+	}
+
+	init_overlay($self);
+	$self->enable(
+		"key_press" => \&key_press,
+		"line_update" => \&line_update,
+	);
+}
+
+sub deactivate {
+	my ($self) = @_;
+
+	$self->disable("key_press", "line_update");
+	if ($self->{overlay}) {
+		delete $self->{overlay};
+		$self->want_refresh();
+	}
+	$self->{activate} = 0;
+}
+

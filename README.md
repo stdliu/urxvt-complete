@@ -1,3 +1,3 @@
-* URxvt Complete
+* URxvt Completion.
 
-TODO
+TODO : add Left, Right key for long string.
