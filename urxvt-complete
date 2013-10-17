@@ -31,12 +31,14 @@ use List::Util qw(min max);
 # 	hl_rend : highlight overlay rend
 # 	ol_start : overlay display start offset in all_match
 # 	cur_index : selected string index in all_match
+# 	empty_line : empty line used to reset overlay line.
 # 	in_line_inc : in line increment, can not be reseted in deactivate
 
 sub on_start {
 	my ($self) = @_; 
 	$self->{hl_rend} = [ () ];
 	$self->{nl_rend} = [ () ];
+	$self->{empty_line} = ' ' x 180;
 }
 
 sub on_user_command {
@@ -72,14 +74,17 @@ sub cursor_text {
 }
 
 sub match_array {
-	my ($all, $cur) = @_;
+	my ($self, $all, $cur) = @_;
+	$all = $self->special_decode($all);
+	$cur = $self->special_decode($cur);
 	my @text_array = split(/\s+/, $all);
+	push(@text_array, split(/[^\w]+/, $all));
 
 	my @match = ();
 	my $len = length($cur);
 	foreach my $str (@text_array) {
 		if ((substr($str, 0, $len) eq $cur) and (length($str) > $len)) {
-			push(@match, $str);
+			push(@match, $self->special_encode($str));
 		}
 	}
 	@match = sort(@match);
@@ -121,7 +126,10 @@ sub set_ol_text {
 		push(@{$self->{nl_rend}}, urxvt::OVERLAY_RSTYLE);
 	}
 
+	$self->{empty_line} = ' ' x $w if (length($self->{empty_line}) < $w);
 	foreach my $i ($start .. $start + $h - 1) {
+		# reset to empty line first
+		$ol->set(0, $i - $start, $self->{empty_line});
 		$ol->set(0, $i - $start, $all[$i],
 			$i == $index ? \@{$self->{hl_rend}} : \@{$self->{nl_rend}});
 	}
@@ -244,7 +252,7 @@ sub activate {
 
 	my $text = all_text($self);
 	my $cur = cursor_text($self);
-	my @all = match_array($text, $cur);
+	my @all = match_array($self, $text, $cur);
 
 	$self->{all_match} = \@all;
 	$self->{match_str} = $cur;
