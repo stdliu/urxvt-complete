@@ -187,12 +187,10 @@ sub goto_next {
 sub line_update {
 	my ($self, $row) = @_; 
 
-	# FIXME : why so many line_update called after activate?
-	# LOG "enger line update.";
 	my $cur = cursor_text($self);
 	my ($row, $col) = $self->screen_cur();
-	if ((length($cur) == length($self->{match_str})
-				and $row == $self->{prev_row} and $col == $self->{prev_col})) {
+	if ($cur eq $self->{match_str}
+			and $row == $self->{prev_row} and $col == $self->{prev_col}) {
 		return;
 	}
 	if (length($cur) > length($self->{match_str})) {
