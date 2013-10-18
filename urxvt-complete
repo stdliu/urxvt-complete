@@ -148,7 +148,7 @@ sub set_ol_text {
 	}
 }
 
-sub init_overlay {
+sub setup_overlay {
 	my ($self) = @_;
 
 	my @all= @{$self->{all_match}};
@@ -172,7 +172,6 @@ sub init_overlay {
 	my $ol = $self->{overlay};
 	$self->want_refresh();
 
-	set_ol_text($self);
 }
 
 sub goto_next {
@@ -201,8 +200,16 @@ sub line_update {
 	}
 
 	$self->{in_line_update} = 1;
-	deactivate($self);
-	activate($self);
+	if ($row == $self->{prev_row} and $col > $self->{prev_col}
+			and substr($cur, 0, length($self->{match_str})) eq $self->{match_str}) {
+		$self->{match_str} = $cur;
+		my $len = length($cur);
+		@{$self->{all_match}} = grep { length($_) > $len and substr($_, 0, $len) eq $cur } @{$self->{all_match}};
+		deactivate($self) if !display_match($self);
+	} else {
+		deactivate($self);
+		activate($self);
+	}
 	$self->{in_line_update} = 0;
 }
 
@@ -265,25 +272,33 @@ sub commit {
 	$self->tt_write($self->locale_encode($self->special_decode($str)));
 }
 
+sub display_match {
+	my ($self) = @_;
+
+	$self->{cur_index} = 0;
+	if (! @{$self->{all_match}}) {
+		return 0;
+	} elsif (scalar(@{$self->{all_match}}) == 1 && !$self->{in_line_update}) {
+		commit($self);
+		return 1;
+	}
+
+	setup_overlay($self);
+	set_ol_text($self);
+	return 1;
+}
+
+
 sub activate {
 	my ($self) = @_;
 
 	my $cur = cursor_text($self);
-	my @all = match_array($self, $cur);
 
-	$self->{all_match} = \@all;
+	$self->{all_match} = [ match_array($self, $cur) ];
 	$self->{match_str} = $cur;
-	$self->{cur_index} = 0;
 
-	if (! @all) {
-		return;
-	} elsif (scalar(@all) == 1 && !$self->{in_line_update}) {
-		commit($self);
-		return;
-	}
-
+	return if !display_match($self);
 	$self->{activate} = 1;
-	init_overlay($self);
 	$self->enable(
 		"key_press" => \&key_press,
 		"line_update" => \&line_update,
