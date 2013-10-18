@@ -41,7 +41,7 @@ sub LOG {
 # 	ol_start : overlay display start offset in all_match
 # 	cur_index : selected string index in all_match
 # 	empty_row : empty string, used to reset overlay row.
-# 	in_line_inc : in line increment, can not be reseted in deactivate
+# 	in_line_update: in line update, can not be reseted in deactivate
 
 sub on_start {
 	my ($self) = @_; 
@@ -193,13 +193,11 @@ sub line_update {
 			and $row == $self->{prev_row} and $col == $self->{prev_col}) {
 		return;
 	}
-	if (length($cur) > length($self->{match_str})) {
-		$self->{in_line_inc} = 1;
-	} else {
-		$self->{in_line_inc} = 0;
-	}
+
+	$self->{in_line_update} = 1;
 	deactivate($self);
 	activate($self);
+	$self->{in_line_update} = 0;
 }
 
 sub key_press {
@@ -235,10 +233,11 @@ sub key_press {
 	} elsif (($event->{state} & urxvt::ControlMask) || ($event->{state} & urxvt::Mod1Mask)) { # Mod1 == ALT
 		if ($char eq 'n') {
 			goto_next($self, 1);
+			return 1;
 		} elsif ($char eq 'p') {
 			goto_next($self, -1);
+			return 1;
 		}
-		return 1;
 	}
 	return ;
 }
@@ -272,7 +271,7 @@ sub activate {
 
 	if (! @all) {
 		return;
-	} elsif (scalar(@all) == 1 && !$self->{in_line_inc}) {
+	} elsif (scalar(@all) == 1 && !$self->{in_line_update}) {
 		commit($self);
 		return;
 	}
