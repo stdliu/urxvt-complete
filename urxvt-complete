@@ -7,8 +7,9 @@
 # Usage : 
 # URxvt.perl-ext-common: urxvt-complete
 # URxvt.keysym.M-Tab: perl:urxvt-complete:activate
+# URxvt.keysym.M-0x2f: perl:urxvt-complete:activate
 #
-# Use Meta-Tab to activate complete mode, then use the following keys:
+# Use Alt-Tab or Alt-/ to activate completion mode, then use the following keys:
 # 	Ctrl-n/Alt-n/Down : choose next.
 # 	Ctrl-p/Alt-p/Up : choose prev.
 # 	Tab : forward common prefix, or choise next.
