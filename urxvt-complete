@@ -42,12 +42,14 @@ sub LOG {
 # 	cur_index : selected string index in all_match
 # 	empty_row : empty string, used to reset overlay row.
 # 	in_line_update: in line update, can not be reseted in deactivate
+# 	url_pattern : URL regex pattern.
 
 sub on_start {
 	my ($self) = @_; 
 	$self->{hl_rend} = [ () ];
 	$self->{nl_rend} = [ () ];
 	$self->{empty_row} = ' ' x 180;
+	$self->{url_pattern} = qr{(?:\w+://|mailto:|www\.)[\w\-\@;\/?:&=%\$_.+!*\x27(),~#]+[\w\-\@;\/?&=%\$_+!*\x27()~]};
 }
 
 sub on_user_command {
@@ -88,7 +90,10 @@ sub match_array {
 	$all = $self->special_decode($all);
 	$cur = $self->special_decode($cur);
 
-	my %seen = map {$_ => 1} (split(/\s+/, $all), split(/[^\w]+/, $all));
+	my %seen = map {$_ => 1} (
+		split(/\s+/, $all),
+		split(/[^\w]+/, $all),
+		$all =~ /$self->{url_pattern}/g);
 	my @match = ();
 	my $len = length($cur);
 	foreach my $str (keys %seen) {
