@@ -27,7 +27,7 @@ Use Alt-Tab or Alt-/ to activate completion mode, then use the following keys:
 
 ![URL complete](https://raw.github.com/stdliu/urxvt-complete/master/images/url_complete.png "URL complete")
 
-![nano complete](https://raw.github.com/stdliu/urxvt-complete/master/images/nano_complete.png "URL complete")
+![nano complete](https://raw.github.com/stdliu/urxvt-complete/master/images/nano_complete.png "nano complete")
 
 ## TODO
 
