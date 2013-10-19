@@ -17,9 +17,11 @@ Then add the following code to your .Xdefaults/.Xresources :
 
 Use Alt-Tab or Alt-/ to activate completion mode, then use the following keys:
 
-	Ctrl-n/Alt-n/Down : choose next.
-	Ctrl-p/Alt-p/Up : choose prev.
-	Tab : forward common prefix, or choise next.
+	Ctrl-n/Alt-n/Down : next.
+	Ctrl-p/Alt-p/Up : previous.
+	Ctrl-f/Ctrl-v/PageDown : next page.
+	Ctrl-b/Alt-v/PageUp: previous page.
+	Tab : forward common prefix, or next.
 	Enter/Space : commit.
 	Escape: deactivate complete mode.
 

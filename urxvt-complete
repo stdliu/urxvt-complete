@@ -10,9 +10,11 @@
 # URxvt.keysym.M-0x2f: perl:urxvt-complete:activate
 #
 # Use Alt-Tab or Alt-/ to activate completion mode, then use the following keys:
-# 	Ctrl-n/Alt-n/Down : choose next.
-# 	Ctrl-p/Alt-p/Up : choose prev.
-# 	Tab : forward common prefix, or choise next.
+# 	Ctrl-n/Alt-n/Down : next.
+# 	Ctrl-p/Alt-p/Up : previous.
+# 	Ctrl-f/Ctrl-v/PageDown : next page.
+# 	Ctrl-b/Alt-v/PageUp: previous page.
+# 	Tab : forward common prefix, or next.
 # 	Enter/Space : commit.
 # 	Escape: deactivate complete mode.
 #
@@ -39,6 +41,8 @@ sub LOG {
 # 	prev_col : previous corsor col.
 # 	nl_rend : normal overlay rend
 # 	hl_rend : highlight overlay rend
+# 	status_rend : status line overlay rend
+# 	status_line_fmt : status line printf format
 # 	ol_start : overlay display start offset in all_match
 # 	cur_index : selected string index in all_match
 # 	empty_row : empty string, used to reset overlay row.
@@ -51,6 +55,8 @@ sub on_start {
 	$self->{nl_rend} = [ () ];
 	$self->{empty_row} = ' ' x 180;
 	$self->{url_pattern} = qr{(?:\w+://|mailto:|www\.)[\w\-\@;\/?:&=%\$_.+!*\x27(),~#]+[\w\-\@;\/?&=%\$_+!*\x27()~]};
+	$self->{status_rend} = [ () ];
+	$self->{status_line_fmt} = ' [%d of %d] ';
 }
 
 sub on_user_command {
@@ -134,18 +140,22 @@ sub set_ol_text {
 	my $start = $self->{ol_start};
 	my $ol = $self->{overlay};
 
-	for my $i (scalar(@{$self->{hl_rend}}) .. $w) {
+	for (scalar(@{$self->{hl_rend}}) .. $w) {
 		push(@{$self->{hl_rend}}, urxvt::SET_BGCOLOR(urxvt::OVERLAY_RSTYLE, 5));
 		push(@{$self->{nl_rend}}, urxvt::OVERLAY_RSTYLE);
+		push(@{$self->{status_rend}}, urxvt::SET_FGCOLOR(urxvt::OVERLAY_RSTYLE, 0));
 	}
 
 	$self->{empty_row} = ' ' x $w if (length($self->{empty_row}) < $w);
-	foreach my $i ($start .. $start + $h - 1) {
+	foreach my $i ($start .. $start + $h - 2) {
 		# reset to empty line first
 		$ol->set(0, $i - $start, $self->{empty_row});
 		$ol->set(0, $i - $start, $all[$i],
 			$i == $index ? \@{$self->{hl_rend}} : \@{$self->{nl_rend}});
 	}
+	$ol->set(0, $h - 1, $self->{empty_row});
+	my $status_line = sprintf $self->{status_line_fmt}, $index + 1, scalar(@all);
+	$ol->set(0, $h - 1, $status_line, \@{$self->{status_rend}});
 }
 
 sub setup_overlay {
@@ -154,8 +164,9 @@ sub setup_overlay {
 	my @all= @{$self->{all_match}};
 	my $match_len = length($self->{match_str});
 
-	my $h = min(scalar(@all), int($self->nrow / 2));
-	my $w = min(max_str_length(@all), $self->ncol);
+	my $h = min(scalar(@all) + 1, int($self->nrow / 2));
+	my $w = min($self->ncol, max(max_str_length(@all),
+			length(sprintf($self->{status_line_fmt}, scalar(@all), scalar(@all)))));
 	my ($y, $x) = $self->screen_cur();
 	$x = $x - $match_len;
 	$y = ($y + 1 + $h >= $self->nrow) ? ($y - $h) : ($y + 1);
@@ -178,7 +189,7 @@ sub goto_next {
 	my ($self, $forward) = @_;
 
 	my $len = scalar(@{$self->{all_match}});
-	my $h = $self->{ol_h};
+	my $h = $self->{ol_h} - 1;
 	$self->{cur_index} = ($len + $self->{cur_index} + $forward) % $len;
 	if ($self->{ol_start} + $h <= $self->{cur_index}) {
 		$self->{ol_start} = $self->{cur_index} - $h + 1;
@@ -194,7 +205,7 @@ sub goto_next_page {
 	my ($self, $forward) = @_;
 
 	my $len = scalar(@{$self->{all_match}});
-	my $h = $self->{ol_h};
+	my $h = $self->{ol_h} - 1;
 	my $offset = $self->{cur_index} - $self->{ol_start};
 	if ($self->{ol_start} != 0 && $self->{ol_start} + $forward * $h < 0) {
 		$self->{ol_start} = 0;
