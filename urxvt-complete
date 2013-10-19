@@ -178,13 +178,34 @@ sub goto_next {
 	my ($self, $forward) = @_;
 
 	my $len = scalar(@{$self->{all_match}});
+	my $h = $self->{ol_h};
 	$self->{cur_index} = ($len + $self->{cur_index} + $forward) % $len;
-	if ($self->{ol_start} + $self->{ol_h} <= $self->{cur_index}) {
-		$self->{ol_start} = $self->{cur_index} - $self->{ol_h} + 1;
+	if ($self->{ol_start} + $h <= $self->{cur_index}) {
+		$self->{ol_start} = $self->{cur_index} - $h + 1;
 	}
 	if ($self->{ol_start} > $self->{cur_index}) {
 		$self->{ol_start} = $self->{cur_index};
 	}
+
+	set_ol_text($self);
+}
+
+sub goto_next_page {
+	my ($self, $forward) = @_;
+
+	my $len = scalar(@{$self->{all_match}});
+	my $h = $self->{ol_h};
+	my $offset = $self->{cur_index} - $self->{ol_start};
+	if ($self->{ol_start} != 0 && $self->{ol_start} + $forward * $h < 0) {
+		$self->{ol_start} = 0;
+	} else {
+		$self->{ol_start} = ($len + $self->{ol_start} + $forward * $h) % $len;
+	}
+	my $back = $self->{ol_start} + $h - $len;
+	if ($back > 0) {
+		$self->{ol_start} -= $back;
+	}
+	$self->{cur_index} = $self->{ol_start} + $offset;
 
 	set_ol_text($self);
 }
@@ -243,12 +264,28 @@ sub key_press {
 			}
 		}
 		return 1;
+	} elsif ($keysym == 0xff55) { # PageUp
+		goto_next_page($self, -1);
+		return 1;
+	} elsif ($keysym == 0xff56) { # PageDown
+		goto_next_page($self, 1);
+		return 1;
 	} elsif (($event->{state} & urxvt::ControlMask) || ($event->{state} & urxvt::Mod1Mask)) { # Mod1 == ALT
 		if ($char eq 'n') {
 			goto_next($self, 1);
 			return 1;
 		} elsif ($char eq 'p') {
 			goto_next($self, -1);
+			return 1;
+		} elsif ($char eq 'f') {
+			goto_next_page($self, 1);
+			return 1;
+		} elsif ($char eq 'b') {
+			goto_next_page($self, -1);
+			return 1;
+		} elsif ($char eq 'v') {
+			goto_next_page($self, 1) if ($event->{state} & urxvt::ControlMask);
+			goto_next_page($self, -1) if ($event->{state} & urxvt::Mod1Mask);
 			return 1;
 		}
 	}
