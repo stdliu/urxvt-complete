@@ -21,6 +21,7 @@
 
 use List::Util qw(min max);
 use Time::HiRes qw(gettimeofday);
+use File::Basename ();
 
 sub LOG {
 	my @arg = @_;
@@ -48,6 +49,16 @@ sub LOG {
 # 	empty_row : empty string, used to reset overlay row.
 # 	in_line_update: in line update, can not be reseted in deactivate
 # 	url_pattern : URL regex pattern.
+
+# load plugin
+my $plugin_dir = File::Basename::dirname(__FILE__) . "/urxvt-complete-plugin/";
+our @plugin_funs = ();
+if ( -d $plugin_dir) {
+	my @files = glob($plugin_dir . "*.pl");
+	foreach my $f (@files) {
+		do $f;
+	}
+}
 
 sub on_start {
 	my ($self) = @_; 
@@ -96,6 +107,16 @@ sub match_array {
 	my $all = all_text($self, $only_visible);
 	$all = $self->special_decode($all);
 	$cur = $self->special_decode($cur);
+
+	my ($row, $col) = $self->screen_cur();
+	$row = $self->ROW_t($row);
+	$row = substr($row, 0, $col);
+	$row = $self->special_decode($row);
+
+	foreach my $fun (@plugin_funs) {
+		my $plugin_res = &$fun($row, $all);
+		$all = $all . " " . $plugin_res;
+	}
 
 	my %seen = map {$_ => 1} (
 		split(/\s+/, $all),
